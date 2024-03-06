@@ -43,9 +43,12 @@ def problem_4(connection, test = False):
     for row in result:
         print(f"The boat with id {row.bid} and name {row.bname} has been reserved the most times, with {row.times_reserved} reservations")
 
+
+# Need to account for people that have never reserved a boat at all
+        
 def problem_5(connection,test = False):
     # Select all sailors who never returned a red boat
-    query = 'SELECT sailors.sid, sailors.sname FROM sailors INNER JOIN reserves on sailors.sid = reserves.sid INNER JOIN boats on reserves.bid = boats.bid  GROUP BY sailors.sid HAVING (SELECT SUM(case when color = \'red\' then 1 else 0 end)) = 0;'
+    query = 'SELECT sailors.sid, sailors.sname FROM sailors LEFT JOIN reserves on sailors.sid = reserves.sid LEFT JOIN boats on reserves.bid = boats.bid  GROUP BY sailors.sid HAVING (SELECT SUM(case when color = \'red\' then 1 else 0 end)) = 0;'
     result = connection.execute(text(query))
     if test:
         return result
@@ -122,7 +125,7 @@ def problem4_orm(session, test = False):
 
 def problem5_orm(session, test = False):
     # 'SELECT sailors.sid, sailors.sname FROM sailors INNER JOIN reserves on sailors.sid = reserves.sid INNER JOIN boats on reserves.bid = boats.bid  GROUP BY sailors.sid HAVING (SELECT SUM(case when color = \'red\' then 1 else 0 end)) = 0;'
-    stmt = select(Sailor.sid, Sailor.sname).join(Reserves, Sailor.sid == Reserves.sid).join(Boats,Reserves.bid == Boats.bid).group_by(Sailor.sid).having(func.sum(case((Boats.color == 'red',1),else_=0)) == 0)
+    stmt = select(Sailor.sid, Sailor.sname).join(Reserves, Sailor.sid == Reserves.sid,isouter=True).join(Boats,Reserves.bid == Boats.bid,isouter=True).group_by(Sailor.sid).having(func.sum(case((Boats.color == 'red',1),else_=0)) == 0)
     result = session.execute(stmt).all()
     if test:
         return result
@@ -158,6 +161,12 @@ def problem8_orm(session, test = False):
         print(entry)
 
 
+def test_inspections(session):
+    stmt = select(Inspections)
+    result = session.execute(stmt).all()
+    for entry in result:
+        print(entry)
+
 
 class Base(DeclarativeBase):
     pass
@@ -192,13 +201,25 @@ class Boats(Base):
     length = mapped_column(INTEGER)
     def __repr__(self) -> str:
         return f"Boat(boat_id={self.bid!r}, boat_name={self.bname!r}, color={self.color!r}, length = {self.length!r})"
+    
+class Inspections(Base):
+    __tablename__ = "inspections"
+    bid = mapped_column(INTEGER, primary_key=True, nullable=False)
+    last_inspection = mapped_column(DATE)
+    next_inspection = mapped_column(DATE)
+    def __repr__(self) -> str:
+        return f"Inspection(boat_id={self.bid!r}, last_inspection={self.last_inspection!r}, next_inspection={self.next_inspection!r})"
+
 if __name__ == "__main__":
+
+    #functionality to add: table for each boat with last inspection date and next inspection date
+
     from sqlalchemy import create_engine
     from sqlalchemy import text
     engine = create_engine('postgresql+psycopg2://postgres:password@localhost:5432/sailors_boats', echo=True)
     with engine.connect() as connection:
-        for row in problem_7(connection,True):
+        for row in problem_5(connection,True):
             print(row)
    # "SELECT boats.bid, boats.bname, COUNT(boats.bid) times_reserved FROM boats INNER JOIN reserves ON boats.bid = reserves.bid GROUP BY boats.bid;"
-    session = Session(engine)
-    problem7_orm(session)
+    #session = Session(engine)
+   # test_inspections(session)
